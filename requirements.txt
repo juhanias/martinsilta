@@ -1,3 +1,4 @@
 py-cord
 python-dotenv
 pymongo[srv]
+requests
