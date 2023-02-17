@@ -24,12 +24,6 @@ class MenuModule(MartinsiltaModule):
         # Broadcast the menu
         channel = self.dcbot.get_channel(int(os.getenv("DISCORD_MENU_CHANNEL")))
 
-        """
-        if datetime.today().weekday() == 0:
-            await channel.send(embed=SafkaMenu(from_cache=True).formWeekEmbed(self.version))
-        else:
-            await channel.send(embed=SafkaMenu(from_cache=True).formDayEmbed(datetime.today().weekday(), self.version))
-        """
         if datetime.today().weekday() == 0:
             await channel.send(embed=SafkaMenu(from_cache=True).formWeekEmbed(self.version),
                                content=f"<@&{os.getenv('DISCORD_PING_MENU')}> Viikon ruokalista on täällä!")

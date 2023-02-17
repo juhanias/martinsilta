@@ -20,7 +20,7 @@ class SafkaMenu:
             if not os.path.exists("libs/safkaonline/cache"):
                 os.mkdir("libs/safkaonline/cache")
 
-            if not os.path.exists("src/libs/safkaonline/cache/menu.json"):
+            if not os.path.exists("libs/safkaonline/cache/menu.json"):
                 with open("libs/safkaonline/cache/menu.json", "a+", encoding="utf-8") as f:
                     self.json_menu = self.session.get("https://api.safka.online/v1/menu").json()
                     self.days = [SafkaDay(date_json) for date_json in self.json_menu["days"]]
@@ -78,6 +78,7 @@ class SafkaMenu:
         )
 
         return embed
+
     @staticmethod
     def dayIntToStr(dayint: int):
         if dayint == 0:

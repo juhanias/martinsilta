@@ -41,6 +41,7 @@ class ExamPingModule(MartinsiltaModule):
                     )
         self.logger.info(wilma_instance.logout())
 
+
 def setup(bot):
     bot.add_cog(ExamPingModule(bot))
     bot.get_cog("ExamPingModule").fetch_exam_data.start()

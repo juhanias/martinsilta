@@ -1,16 +1,18 @@
+import os
 from datetime import datetime
 
 import discord
 from dotenv import load_dotenv
-import os
 
 from src.libs.safkaonline.SafkaOnline import SafkaMenu
+from src.modules.MenuModule import MenuModule
 
 # Load .env file
 load_dotenv()
 
 # Create client
 client = discord.Bot()
+
 
 # When the bot is ready
 @client.event
