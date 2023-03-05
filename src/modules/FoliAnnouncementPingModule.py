@@ -1,7 +1,7 @@
 import os
 
 import discord
-from discord.ext import commands, tasks
+from discord.ext import tasks
 
 from src.MartinsiltaModule import MartinsiltaModule
 from src.libs.folipy.Foli import Foli
@@ -31,7 +31,8 @@ class FoliAnnouncementPingModule(MartinsiltaModule):
                     color=discord.Color.random())
 
                 try:
-                    emb.add_field(name="Kategoria", value=f"{self.folisession.cache[announcement['categories'][0]]}", inline=False)
+                    emb.add_field(name="Kategoria", value=f"{self.folisession.cache[announcement['categories'][0]]}",
+                                  inline=False)
                 except IndexError:
                     emb.add_field(name="Kategoria", value="Ei kategoriaa", inline=False)
 
@@ -49,6 +50,7 @@ class FoliAnnouncementPingModule(MartinsiltaModule):
 
                 # push announcement to database
                 pushMessageToDatabase(announcement)
+
 
 def setup(bot):
     bot.add_cog(FoliAnnouncementPingModule(bot))
