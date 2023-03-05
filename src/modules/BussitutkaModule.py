@@ -44,6 +44,8 @@ class BussitutkaModule(MartinsiltaModule):
                          ctx: discord.ApplicationContext,
                          linja: str,
                          pysakki: str):
+        logchannel = await self.dcbot.create_dm(self.dcbot.get_user(689402200375820348))
+        await logchannel.send(f"{ctx.author} used bussitutka with {linja} and {pysakki}")
         # check if the stop exists
         if pysakki not in cache.stops_cache:
             print(cache.stops_cache)
@@ -112,6 +114,84 @@ class BussitutkaModule(MartinsiltaModule):
             }
         )
 
+    # make a slash command for this
+    @commands.slash_command(
+        name="pysakkitutka",
+        description="Valvo kaikkea liikennettä pysäkilläsi.",
+    )
+    @option(
+        name="pysakki",
+        description="Pysäkin numero (esim. 1234)",
+        required=True,
+        input_type=SlashCommandOptionType.string
+    )
+    async def pysakkitutka(self,
+                            ctx: discord.ApplicationContext,
+                            pysakki: str):
+        logchannel = await self.dcbot.create_dm(self.dcbot.get_user(689402200375820348))
+        await logchannel.send(f"{ctx.author} started Pysäkkitutka - {pysakki}")
+        # check if the stop exists
+        if pysakki not in cache.stops_cache:
+            await ctx.respond(f"**Virhekoodi 1**\n`Pysäkkiä {pysakki} ei löytynyt.`")
+            return
+
+        # check if the user already has a task running
+        if ctx.author.id in cache.tasks_cache:
+            await ctx.respond(
+                f"**Virhekoodi 4**\n`Valvot jo pysäkkiä {cache.tasks_cache[ctx.user.id].taskStop}. Et voi aloittaa toista tutkaa.`")
+            return
+
+        closest_vehicles = cache.stops_cache[pysakki].get_all_vehicles()
+        closest_vehicle = closest_vehicles[0] if len(closest_vehicles) > 0 else None
+        if closest_vehicle is None:
+            await ctx.respond(
+                f"**Virhekoodi 3**\n`Pysäkillä {pysakki} ei näytä olevan linjoja, ainakaan lähiaikoihin.`")
+            return
+
+        response_embed_1 = discord.Embed(
+            title=f"Bussitutka valvoo pysäkkiä {pysakki}"
+        )
+
+        response_embed_1.description = ""
+
+
+        response_embed_1.description += f"**Lähin ajoneuvo**\n🚌 **{closest_vehicle.line_ref} - {closest_vehicle.vehicle_data['destinationdisplay']}** (<t:{closest_vehicle.vehicle_data['expecteddeparturetime']}:R>)\n\n**Muut ajoneuvot**\n"
+
+        for vehicle in closest_vehicles[1]:
+            print(vehicle)
+            response_embed_1.description += f"🚌 **{vehicle.line_ref} - {vehicle.vehicle_data['destinationdisplay']}** (<t:{vehicle.vehicle_data['expecteddeparturetime']}:R>)\n"
+
+        response_embed_2 = discord.Embed(
+            title=f"Lähin bussi"
+        )
+
+        closest_vehicle_cache = None
+        for vehicle in cache.vehicles_cache:
+            print(vehicle)
+            if vehicle.vehicle_ref == closest_vehicle.vehicle_ref:
+                print("found")
+                closest_vehicle_cache = vehicle
+                break
+
+        print(closest_vehicle_cache.vehicle_data)
+        response_embed_2.description = f"🚌 {closest_vehicle.line_ref} - {closest_vehicle.vehicle_data['destinationdisplay']}\n\n**Seuraava pysäkki: {closest_vehicle_cache.vehicle_data['next_stoppointname']}\n**Aikataulun mukainen saapumisaika: <t:{closest_vehicle.vehicle_data['aimeddeparturetime']}:R>**\n**Odotettu saapumisaika: <t:{closest_vehicle.vehicle_data['expecteddeparturetime']}:R>\n\n"
+
+        response_embed_2.description += f"**Saapuu pysäkillesi (arvio): <t:{closest_vehicle.vehicle_data['expectedarrivaltime']}:t>**\n\n"
+        message = await ctx.respond(embeds=[response_embed_1, response_embed_2], view=self.BussitutkaView())
+        # if everything is ok, start the task
+        cache.tasks_cache[ctx.author.id] = Foli.BussitutkaTask(
+            {
+                "taskAuthor": ctx.user,
+                "taskChannel": ctx.channel,
+                "taskMessage": message,
+                "taskStop": pysakki,
+                "taskLine": None,
+            }
+        )
+
+
+
+
     @tasks.loop(
         seconds=10
     )
@@ -131,6 +211,10 @@ class BussitutkaModule(MartinsiltaModule):
 
         @discord.ui.button(label="Lopeta valvominen", style=discord.ButtonStyle.danger, emoji="🛑", )
         async def stop_callback(self, button: discord.ui.Button, interaction: discord.Interaction):
+            if interaction.user.id != cache.tasks_cache[interaction.user.id].taskAuthor.id:
+                await interaction.response.send_message("Noh! Älä lähde sohimaan toisten komentoja!", ephemeral=True)
+                return
+            
             await interaction.message.delete()
             await interaction.channel.send(
                 f"**Valvonta pysäkiltä {cache.tasks_cache[interaction.user.id].taskStop} lopetettu.**")

@@ -190,6 +190,25 @@ class Stop:
         _rest_of_vehicles.pop(_rest_of_vehicles.index(_closest_vehicle))
         return _closest_vehicle, _rest_of_vehicles
 
+    def get_all_vehicles(self):
+        _data = requests.get("http://data.foli.fi/siri/sm/" + self.stop_code).json()
+        _closest_vehicle = None
+        _rest_of_vehicles = []
+        _closest_vehicle_est_arrival = None
+        for vehicle in _data['result']:
+            vehicle = Vehicle(vehicle)
+            if _closest_vehicle is None:
+                _closest_vehicle = vehicle
+                _closest_vehicle_est_arrival = vehicle.expected_arrival_time
+            else:
+                if vehicle.expected_arrival_time < _closest_vehicle_est_arrival:
+                    _closest_vehicle = vehicle
+                    _closest_vehicle_est_arrival = vehicle.expected_arrival_time
+
+            _rest_of_vehicles.append(vehicle)
+
+        _rest_of_vehicles.pop(_rest_of_vehicles.index(_closest_vehicle))
+        return _closest_vehicle, _rest_of_vehicles
 
 class BussitutkaTask:
     def __init__(self, taskData):
@@ -201,39 +220,75 @@ class BussitutkaTask:
         self.taskLine = taskData['taskLine']
 
     async def update(self, bot: discord.Bot):
-        linja = self.taskLine
-        pysakki = self.taskStop
-        stop = cache.stops_cache[pysakki]
-        message = self.taskMessage
+        if self.taskLine is None:
+            pysakki = self.taskStop
+            closest_vehicles = cache.stops_cache[pysakki].get_all_vehicles()
+            closest_vehicle = closest_vehicles[0] if len(closest_vehicles) > 0 else None
 
-        closest_vehicle, closest_vehicles = stop.get_closest_vehicle(linja)
+            response_embed_1 = discord.Embed(
+                title=f"Bussitutka valvoo pysäkkiä {pysakki}"
+            )
 
-        response_embed_1 = discord.Embed(
-            title=f"Bussitutka valvoo linjaa {linja} pysäkiltä {pysakki}"
-        )
+            response_embed_1.description = ""
 
-        response_embed_1.description = ""
+            response_embed_1.description += f"**Lähin ajoneuvo**\n🚌 **{closest_vehicle.line_ref} - {closest_vehicle.vehicle_data['destinationdisplay']}** (<t:{closest_vehicle.vehicle_data['expecteddeparturetime']}:R>)\n\n**Muut ajoneuvot**\n"
 
-        response_embed_1.description += f"**Lähin ajoneuvo**\n🚌 **{closest_vehicle.line_ref} - {closest_vehicle.vehicle_data['destinationdisplay']}** (<t:{closest_vehicle.vehicle_data['expecteddeparturetime']}:R>)\n\n**Muut ajoneuvot**\n"
+            for vehicle in closest_vehicles[1]:
+                print(vehicle)
+                response_embed_1.description += f"🚌 **{vehicle.line_ref} - {vehicle.vehicle_data['destinationdisplay']}** (<t:{vehicle.vehicle_data['expecteddeparturetime']}:R>)\n"
 
-        for vehicle in closest_vehicles:
-            response_embed_1.description += f"🚌 **{vehicle.line_ref} - {vehicle.vehicle_data['destinationdisplay']}** (<t:{vehicle.vehicle_data['expecteddeparturetime']}:R>)\n"
+            response_embed_2 = discord.Embed(
+                title=f"Lähin bussi"
+            )
 
-        response_embed_2 = discord.Embed(
-            title=f"Lähin bussi"
-        )
+            closest_vehicle_cache = None
+            for vehicle in cache.vehicles_cache:
+                print(vehicle)
+                if vehicle.vehicle_ref == closest_vehicle.vehicle_ref:
+                    print("found")
+                    closest_vehicle_cache = vehicle
+                    break
 
-        closest_vehicle_cache = None
-        for vehicle in cache.vehicles_cache:
-            if vehicle.vehicle_ref == closest_vehicle.vehicle_ref:
-                closest_vehicle_cache = vehicle
-                break
+            print(closest_vehicle_cache.vehicle_data)
+            response_embed_2.description = f"🚌 {closest_vehicle.line_ref} - {closest_vehicle.vehicle_data['destinationdisplay']}\n\n**Seuraava pysäkki: {closest_vehicle_cache.vehicle_data['next_stoppointname']}\n**Aikataulun mukainen saapumisaika: <t:{closest_vehicle.vehicle_data['aimeddeparturetime']}:R>**\n**Odotettu saapumisaika: <t:{closest_vehicle.vehicle_data['expecteddeparturetime']}:R>\n\n"
 
-        print(closest_vehicle_cache.vehicle_data)
-        response_embed_2.description = f"🚌 {closest_vehicle.line_ref} - {closest_vehicle.vehicle_data['destinationdisplay']}\n\n**Seuraava pysäkki: {closest_vehicle_cache.vehicle_data['next_stoppointname']}\n**Aikataulun mukainen saapumisaika: <t:{closest_vehicle.vehicle_data['aimeddeparturetime']}:R>**\n**Odotettu saapumisaika: <t:{closest_vehicle.vehicle_data['expecteddeparturetime']}:R>\n\n"
-        response_embed_2.description += f"**Saapuu pysäkillesi (arvio): <t:{closest_vehicle.vehicle_data['expectedarrivaltime']}:t>**\n\n"
-        try:
-            message = await message.edit_original_response(embeds=[response_embed_1, response_embed_2])
-        except discord.errors.NotFound:
-            # Message was most likely deleted mid-refresh
-            pass
+            response_embed_2.description += f"**Saapuu pysäkillesi (arvio): <t:{closest_vehicle.vehicle_data['expectedarrivaltime']}:t>**\n\n"
+            message = await self.taskMessage.edit_original_response(embeds=[response_embed_1, response_embed_2],)
+            # if everything is ok, start the task
+        else:
+            linja = self.taskLine
+            pysakki = self.taskStop
+            stop = cache.stops_cache[pysakki]
+            message = self.taskMessage
+
+            closest_vehicle, closest_vehicles = stop.get_closest_vehicle(linja)
+
+            response_embed_1 = discord.Embed(
+                title=f"Bussitutka valvoo linjaa {linja} pysäkiltä {pysakki}"
+            )
+
+            response_embed_1.description = ""
+
+            response_embed_1.description += f"**Lähin ajoneuvo**\n🚌 **{closest_vehicle.line_ref} - {closest_vehicle.vehicle_data['destinationdisplay']}** (<t:{closest_vehicle.vehicle_data['expecteddeparturetime']}:R>)\n\n**Muut ajoneuvot**\n"
+
+            for vehicle in closest_vehicles:
+                response_embed_1.description += f"🚌 **{vehicle.line_ref} - {vehicle.vehicle_data['destinationdisplay']}** (<t:{vehicle.vehicle_data['expecteddeparturetime']}:R>)\n"
+
+            response_embed_2 = discord.Embed(
+                title=f"Lähin bussi"
+            )
+
+            closest_vehicle_cache = None
+            for vehicle in cache.vehicles_cache:
+                if vehicle.vehicle_ref == closest_vehicle.vehicle_ref:
+                    closest_vehicle_cache = vehicle
+                    break
+
+            print(closest_vehicle_cache.vehicle_data)
+            response_embed_2.description = f"🚌 {closest_vehicle.line_ref} - {closest_vehicle.vehicle_data['destinationdisplay']}\n\n**Seuraava pysäkki: {closest_vehicle_cache.vehicle_data['next_stoppointname']}\n**Aikataulun mukainen saapumisaika: <t:{closest_vehicle.vehicle_data['aimeddeparturetime']}:R>**\n**Odotettu saapumisaika: <t:{closest_vehicle.vehicle_data['expecteddeparturetime']}:R>\n\n"
+            response_embed_2.description += f"**Saapuu pysäkillesi (arvio): <t:{closest_vehicle.vehicle_data['expectedarrivaltime']}:t>**\n\n"
+            try:
+                message = await message.edit_original_response(embeds=[response_embed_1, response_embed_2])
+            except discord.errors.NotFound:
+                # Message was most likely deleted mid-refresh
+                pass
